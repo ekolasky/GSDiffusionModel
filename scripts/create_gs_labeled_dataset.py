@@ -20,3 +20,4 @@ def check_directory_structure():
 
     print(f"Directory structure verified. Found {len(subfolders)} category folders.")
     return subfolders
+
