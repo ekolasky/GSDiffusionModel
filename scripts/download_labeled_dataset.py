@@ -4,7 +4,6 @@
 This script downloads the CO3D dataset. It saves each category of the dataset into a seperate folder.
 """
 
-
 import os
 import argparse
 import sys
@@ -12,34 +11,16 @@ import json
 import requests
 import zipfile
 from tqdm import tqdm
+import shutil
 
-def check_directory_structure():
-    base_path = 'data/labeled_gs'
-    raw_path = os.path.join(base_path, 'raw')
-
-    if not os.path.isdir(raw_path):
-        raise FileNotFoundError(f"The '/raw' subfolder does not exist in {base_path}.")
-
-    subfolders = [f for f in os.listdir(raw_path) if os.path.isdir(os.path.join(raw_path, f))]
-    
-    if not subfolders:
-        raise FileNotFoundError(f"No category folders found within {raw_path}.")
-
-    print(f"Directory structure verified. Found {len(subfolders)} category folders.")
-    return subfolders
-
-def process_category(category):
+def process_category(category, links):
     print(f"Processing category: {category}")
     
-    # Load links from JSON file
-    with open('data/labeled_gs/links.json', 'r') as f:
-        links_data = json.load(f)
-    
-    if category not in links_data['full']:
+    if category not in links['full']:
         print(f"Error: Category '{category}' not found in links.json")
         return
     
-    category_links = links_data['full'][category]
+    category_links = links['full'][category]
     
     # Create category folder
     category_path = os.path.join('data/labeled_gs/raw', category)
@@ -79,11 +60,9 @@ def main():
     parser.add_argument('--category', type=str, help='Specific category to process (optional)')
     args = parser.parse_args()
 
-    try:
-        available_categories = check_directory_structure()
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+    with open('data/labeled_gs/links.json', 'r') as f:
+        links = json.load(f)
+        available_categories = [k for k in links["full"].keys()]
 
     if args.category:
         if args.category not in available_categories:
@@ -94,10 +73,21 @@ def main():
     else:
         categories_to_process = available_categories
 
+    # Check if raw path exists and if it does delete any folders that we're replacing
+    if not os.path.isdir('data/labeled_gs/raw'):
+        os.makedirs('data/labeled_gs/raw', exist_ok=True)
+    else:
+        for category in categories_to_process:
+            category_path = os.path.join('data/labeled_gs/raw', category)
+            if os.path.isdir(category_path):
+                print(f"Deleting: ${category_path}")
+                shutil.rmtree(category_path)
+                
+
     print(f"Categories to process: {', '.join(categories_to_process)}")
     
     for category in categories_to_process:
-        process_category(category)
+        process_category(category, links)
 
 
 if __name__ == "__main__":
