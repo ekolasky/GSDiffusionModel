@@ -1,2 +1,2 @@
-# Ignore GitHub token file
 notebooks/gh_token.txt
+data/labeled_gs/raw
