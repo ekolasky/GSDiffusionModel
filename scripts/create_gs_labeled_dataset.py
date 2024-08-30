@@ -4,6 +4,8 @@ This script processes the CO3D dataset into Gaussian Splats. By default it runs 
 If you provide a category as an argument, it will only process that category.
 """
 
+import os
+
 def check_directory_structure():
     base_path = 'data/labeled_gs'
     raw_path = os.path.join(base_path, 'raw')
