@@ -8,7 +8,6 @@ import subprocess
 import numpy as np
 from plyfile import PlyData
 import sys
-from IPython.display import clear_output
 from co3d.dataset.data_types import (
     load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
 )
@@ -33,7 +32,6 @@ def generate_gs_for_folder(folder_path):
         # Function to handle output
         def print_output(stream):
             for line in stream:
-                clear_output(wait=True)
                 print(line, end='')
                 sys.stdout.flush()
         
