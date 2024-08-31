@@ -10,11 +10,11 @@ from co3d.dataset.data_types import (
     load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
 )
 
-def convert_co3d_folder_to_gs(folder_path):
+def generate_gs_for_folder(folder_path):
     """
-    Add GS data to a folder with CO3D data.
+    Add GS data to a folder with CO3D data and corresponding COLMAP data.
     """
-    pass
+    
 
 def add_colmap_to_category_folders(path):
     """
