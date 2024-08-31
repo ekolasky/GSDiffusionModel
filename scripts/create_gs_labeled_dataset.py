@@ -51,7 +51,7 @@ def main():
 
     # Check that all subfolders exist for all categories
     if any([category not in subfolders for category in categories_to_process]):
-        raise Error("Subfolder missing for some categories")
+        raise Exception("Subfolder missing for some categories")
 
     for category in categories_to_process:
         print(f"Processing category: {category}")
