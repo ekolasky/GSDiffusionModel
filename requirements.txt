@@ -5,3 +5,4 @@ torch
 torchaudio
 torchvision
 opencv-python
+ipython

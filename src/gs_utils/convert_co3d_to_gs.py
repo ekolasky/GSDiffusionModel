@@ -7,6 +7,8 @@ import os
 import subprocess
 import numpy as np
 from plyfile import PlyData
+import sys
+from IPython.display import clear_output
 from co3d.dataset.data_types import (
     load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
 )
@@ -21,12 +23,33 @@ def generate_gs_for_folder(folder_path):
     print(os.path.abspath(folder_path))
     
     try:
-        result = subprocess.run(["python", script_path, "-s", folder_path], check=True, text=True, capture_output=True)
-        print(result.stdout)
-    except subprocess.CalledProcessError as e:
-        print(f"Error running script: {e}")
-        print(f"Script output: {e.stdout}")
-        print(f"Script error: {e.stderr}")
+        process = subprocess.Popen(["python", script_path, "-s", folder_path], 
+                                   stdout=subprocess.PIPE, 
+                                   stderr=subprocess.PIPE, 
+                                   text=True, 
+                                   bufsize=1, 
+                                   universal_newlines=True)
+        
+        # Function to handle output
+        def print_output(stream):
+            for line in stream:
+                clear_output(wait=True)
+                print(line, end='')
+                sys.stdout.flush()
+        
+        # Print output in real-time
+        while process.poll() is None:
+            print_output(process.stdout)
+            print_output(process.stderr)
+        
+        # Print any remaining output
+        print_output(process.stdout)
+        print_output(process.stderr)
+        
+        if process.returncode != 0:
+            print(f"Error running script. Return code: {process.returncode}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
     
 
 def add_colmap_to_category_folders(path):
