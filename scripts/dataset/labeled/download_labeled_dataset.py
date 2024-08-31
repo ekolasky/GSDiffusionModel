@@ -45,9 +45,11 @@ def process_category(category, links):
                 size = file.write(data)
                 progress_bar.update(size)
         
-        # Unzip file
+        # Unzip file with progress bar
         with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
-            zip_ref.extractall(category_path)
+            total_files = len(zip_ref.infolist())  # Total number of files to extract
+            for file in tqdm(zip_ref.infolist(), total=total_files, desc="Extracting"):
+                zip_ref.extract(file, category_path)
         
         # Remove zip file after extraction
         os.remove(zip_filename)

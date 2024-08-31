@@ -4,16 +4,29 @@ Functions to convert data from CO3D to Gaussian Splatting format.
 
 from typing import List
 import os
+import subprocess
 import numpy as np
 from plyfile import PlyData
 from co3d.dataset.data_types import (
     load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
 )
 
+
 def generate_gs_for_folder(folder_path):
     """
     Add GS data to a folder with CO3D data and corresponding COLMAP data.
     """
+    script_path = os.path.join("submodules", "gaussian-splatting", "train.py")
+    print(os.path.abspath(script_path))
+    print(os.path.abspath(folder_path))
+    
+    try:
+        result = subprocess.run(["python", script_path, "-s", folder_path], check=True, text=True, capture_output=True)
+        print(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running script: {e}")
+        print(f"Script output: {e.stdout}")
+        print(f"Script error: {e.stderr}")
     
 
 def add_colmap_to_category_folders(path):
@@ -95,14 +108,18 @@ def add_colmap_to_category_folders(path):
         camera_txt = _get_camera_txt(cameras_list)
         points3D_txt = _convert_ply_to_points3D(os.path.join(path, sequence_name, "pointcloud.ply"))
 
-        with open(os.path.join(path, sequence_name, "cameras.bin"), "wb") as f:
-            f.write(camera_txt.encode('utf-8'))
+        
+        metadata_path = os.path.join(path, sequence_name, "sparse", "0")
+        os.makedirs(metadata_path, exist_ok=True)
 
-        with open(os.path.join(path, sequence_name, "images.bin"), "wb") as f:
-            f.write(image_txt.encode('utf-8'))
+        with open(os.path.join(metadata_path, "cameras.txt"), "w") as f:
+            f.write(camera_txt)
 
-        with open(os.path.join(path, sequence_name, "points3D.bin"), "wb") as f:
-            f.write(points3D_txt.encode('utf-8'))
+        with open(os.path.join(metadata_path, "images.txt"), "w") as f:
+            f.write(image_txt)
+
+        with open(os.path.join(metadata_path, "points3D.txt"), "w") as f:
+            f.write(points3D_txt)
 
         print(f"Added COLMAP data to {sequence_name}")
 

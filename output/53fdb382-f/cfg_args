@@ -1,0 +1,1 @@
+Namespace(sh_degree=3, source_path='/workspace/GSDiffusionModel/data/labeled_gs/raw/hydrant/hydrant/106_12653_23216', model_path='./output/53fdb382-f', images='images', depths='', resolution=-1, white_background=False, train_test_exp=False, data_device='cuda', eval=False)
