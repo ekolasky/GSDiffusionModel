@@ -8,7 +8,7 @@ import os
 import argparse
 import json
 import sys
-from src.gs_utils.convert_co3d_to_gs import add_colmap_to_category_folders
+from src.gs_utils.convert_co3d_to_gs import add_colmap_to_category_folders, generate_gs_for_folder
 
 
 def check_directory_structure():
@@ -58,7 +58,8 @@ def main():
         category_path = os.path.join('data/labeled_gs/raw', category)
         for folder in [f for f in os.listdir(category_path) if os.path.isdir(os.path.join(category_path, f))]:
             print(f"Processing folder: {os.path.join(category_path, folder)}")
-            add_colmap_to_category_folders(os.path.join(category_path, folder))
+            # add_colmap_to_category_folders(os.path.join(category_path, folder))
+            generate_gs_for_folder(os.path.join(category_path, folder, "106_12653_23216"))
         
             
 
