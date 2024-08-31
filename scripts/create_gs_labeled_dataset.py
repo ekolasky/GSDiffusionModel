@@ -5,6 +5,10 @@ If you provide a category as an argument, it will only process that category.
 """
 
 import os
+import argparse
+import json
+import sys
+
 
 def check_directory_structure():
     base_path = 'data/labeled_gs'
@@ -21,3 +25,33 @@ def check_directory_structure():
     print(f"Directory structure verified. Found {len(subfolders)} category folders.")
     return subfolders
 
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Process CO3D dataset into Gaussian Splats.")
+    parser.add_argument('--category', type=str, help='Specific category to process (optional)')
+    args = parser.parse_args()
+
+    with open('data/labeled_gs/links.json', 'r') as f:
+        links = json.load(f)
+        available_categories = [k for k in links["full"].keys()]
+
+    # Double check that the category is valid
+    if args.category:
+        if args.category not in available_categories:
+            print(f"Error: Category '{args.category}' not found in available categories.")
+            print(f"Available categories: {', '.join(available_categories)}")
+            sys.exit(1)
+        categories_to_process = [args.category]
+    else:
+        categories_to_process = available_categories
+
+    check_directory_structure()
+
+    for category in categories_to_process:
+        print(f"Processing category: {category}")
+        for folder in os.listdir(os.path.join('data/labeled_gs/raw', category)):
+            print(f"Processing folder: {folder}")
+
+if __name__ == "__main__":
+    main()
