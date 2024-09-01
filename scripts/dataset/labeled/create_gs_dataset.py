@@ -8,7 +8,7 @@ import os
 import argparse
 import json
 import sys
-from src.gs_utils.convert_co3d_to_gs import add_colmap_to_category_folders, generate_gs_for_folder
+from src.gs_utils.convert_co3d_to_gs import add_colmap_to_category_folders, generate_gs_for_folder, add_gs_to_colmap_folders
 
 
 def check_directory_structure():
@@ -31,6 +31,7 @@ def check_directory_structure():
 def main():
     parser = argparse.ArgumentParser(description="Process CO3D dataset into Gaussian Splats.")
     parser.add_argument('--category', type=str, help='Specific category to process (optional)')
+    parser.add_argument('--network_gui', type=bool, help='Specific category to process (optional)')
     args = parser.parse_args()
 
     with open('data/labeled_gs/links.json', 'r') as f:
@@ -59,7 +60,7 @@ def main():
         for folder in [f for f in os.listdir(category_path) if os.path.isdir(os.path.join(category_path, f))]:
             print(f"Processing folder: {os.path.join(category_path, folder)}")
             # add_colmap_to_category_folders(os.path.join(category_path, folder))
-            generate_gs_for_folder(os.path.join(category_path, folder, "106_12653_23216"))
+            add_gs_to_colmap_folders(os.path.join(category_path, folder), iteration_num="5_000")
         
             
 
