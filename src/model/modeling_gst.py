@@ -25,8 +25,8 @@ class GSTConfig(PretrainedConfig):
         self.num_layers = kwargs.get("num_layers", 12)
         self.dropout = kwargs.get("dropout", 0.1)
         self.initializer_range = kwargs.get("initializer_range", 0.02)
-        self.layer_norm_eps = kwargs.get("layer_norm_eps", 1e-12),
-        # self.noise_levels = NoiseLevels(**kwargs.get("noise_levels", {})),
+        self.layer_norm_eps = kwargs.get("layer_norm_eps", 1e-12)
+        # self.noise_levels = NoiseLevels(**kwargs.get("noise_levels", {}))
         self.timesteps = kwargs.get("timesteps", 250)
         self.max_level_pos = kwargs.get("max_level_pos", 1)
         self.max_level_color = kwargs.get("max_level_color", 1)
