@@ -15,6 +15,7 @@ class NoiseLevels:
         self.max_level_scale = kwargs.get("max_level_scale", 1)
         self.max_level_rot = kwargs.get("max_level_rot", 1),
 
+
 class GSTConfig(PretrainedConfig):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
