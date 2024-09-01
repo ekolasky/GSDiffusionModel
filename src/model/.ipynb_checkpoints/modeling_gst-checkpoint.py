@@ -4,19 +4,39 @@ from transformers import PreTrainedModel, PretrainedConfig
 import torch
 import torch.utils.checkpoint
 from torch import nn
+import json
 
+
+# class NoiseLevels():
+#     def __init__(self, **kwargs):
+
+#     def __repr__(self):
+#         return f"NoiseLevels({', '.join(f'{k}={v}' for k, v in self.__dict__.items())})"
+    
 
 class GSTConfig(PretrainedConfig):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.input_size = kwargs.get("input_size", 14)
-        self.max_length = kwargs.get("max_length", 1024)
+        self.max_length = kwargs.get("max_length", 2048)
         self.hidden_size = kwargs.get("hidden_size", 512)
         self.num_heads = kwargs.get("num_heads", 8)
         self.num_layers = kwargs.get("num_layers", 12)
         self.dropout = kwargs.get("dropout", 0.1)
         self.initializer_range = kwargs.get("initializer_range", 0.02)
-        self.layer_norm_eps = kwargs.get("layer_norm_eps", 1e-12)
+        self.layer_norm_eps = kwargs.get("layer_norm_eps", 1e-12),
+        # self.noise_levels = NoiseLevels(**kwargs.get("noise_levels", {})),
+        self.timesteps = kwargs.get("timesteps", 250)
+        self.max_level_pos = kwargs.get("max_level_pos", 1)
+        self.max_level_color = kwargs.get("max_level_color", 1)
+        self.max_level_opacity = kwargs.get("max_level_opacity", 1)
+        self.max_level_scale = kwargs.get("max_level_scale", 1)
+        self.max_level_rot = kwargs.get("max_level_rot", 1)
+
+    @classmethod
+    def load_from_json(cls, path):
+        with open(path, "r") as f:
+            return cls(**json.load(f))
 
 class GSTEmbeddings(nn.Module):
 

@@ -115,7 +115,13 @@ def main():
     test_dataloader = torch.utils.data.DataLoader(GSDataset(test_dataset), batch_size=args.batch_size, shuffle=False)
 
     # Initialize the model
-    config = GSTConfig()
+    config = GSTConfig(noise_levels={
+            "max_level_pos": 1,
+            "max_level_color": 1,
+            "max_level_opacity": 1,
+            "max_level_scale": 1,
+            "max_level_rot": 1
+        })
     model = GSTModel(config).to(device)
 
     # Print model parameter number

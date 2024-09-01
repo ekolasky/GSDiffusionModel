@@ -7,13 +7,12 @@ from torch import nn
 import json
 
 
-class NoiseLevels:
-    def __init__(self, **kwargs):
-        self.max_level_pos = kwargs.get("max_level_pos", 1)
-        self.max_level_color = kwargs.get("max_level_color", 1)
-        self.max_level_opacity = kwargs.get("max_level_opacity", 1)
-        self.max_level_scale = kwargs.get("max_level_scale", 1)
-        self.max_level_rot = kwargs.get("max_level_rot", 1),
+# class NoiseLevels():
+#     def __init__(self, **kwargs):
+
+#     def __repr__(self):
+#         return f"NoiseLevels({', '.join(f'{k}={v}' for k, v in self.__dict__.items())})"
+    
 
 
 class GSTConfig(PretrainedConfig):
@@ -27,8 +26,13 @@ class GSTConfig(PretrainedConfig):
         self.dropout = kwargs.get("dropout", 0.1)
         self.initializer_range = kwargs.get("initializer_range", 0.02)
         self.layer_norm_eps = kwargs.get("layer_norm_eps", 1e-12),
-        self.noise_levels = kwargs.get("noise_levels", NoiseLevels()),
+        # self.noise_levels = NoiseLevels(**kwargs.get("noise_levels", {})),
         self.timesteps = kwargs.get("timesteps", 250)
+        self.max_level_pos = kwargs.get("max_level_pos", 1)
+        self.max_level_color = kwargs.get("max_level_color", 1)
+        self.max_level_opacity = kwargs.get("max_level_opacity", 1)
+        self.max_level_scale = kwargs.get("max_level_scale", 1)
+        self.max_level_rot = kwargs.get("max_level_rot", 1)
 
     @classmethod
     def load_from_json(cls, path):
