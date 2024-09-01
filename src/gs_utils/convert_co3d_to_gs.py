@@ -7,48 +7,70 @@ import os
 import subprocess
 import numpy as np
 from plyfile import PlyData
+import cv2
 import sys
 from co3d.dataset.data_types import (
     load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
 )
 
 
-def generate_gs_for_folder(folder_path):
+def generate_gs_for_folder(folder_path, iteration_num, network_gui=False):
     """
     Add GS data to a folder with CO3D data and corresponding COLMAP data.
     """
     script_path = os.path.join("submodules", "gaussian-splatting", "train.py")
     print(os.path.abspath(script_path))
     print(os.path.abspath(folder_path))
+
+    script_args = ["python", script_path, "-s", folder_path, "--model_path", os.path.abspath(folder_path)]
+
+    if iteration_num:
+        script_args += ["--iterations", iteration_num]
+    
+    if network_gui:
+        script_args += ["--ip", "0.0.0.0", "--port", "6009"]
+    else:
+        script_args += ["--disable_viewer"]
     
     try:
-        process = subprocess.Popen(["python", script_path, "-s", folder_path], 
-                                   stdout=subprocess.PIPE, 
-                                   stderr=subprocess.PIPE, 
-                                   text=True, 
-                                   bufsize=1, 
-                                   universal_newlines=True)
-        
-        # Function to handle output
-        def print_output(stream):
-            for line in stream:
-                print(line, end='')
-                sys.stdout.flush()
-        
-        # Print output in real-time
-        while process.poll() is None:
-            print_output(process.stdout)
-            print_output(process.stderr)
-        
-        # Print any remaining output
-        print_output(process.stdout)
-        print_output(process.stderr)
-        
-        if process.returncode != 0:
-            print(f"Error running script. Return code: {process.returncode}")
+        result = subprocess.run(
+            script_args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    
+        # Check if there were any errors and print them
+        if result.returncode != 0:
+            print(f"Error running script. Return code: {result.returncode}")
+            print("Error output:")
+            print(result.stderr)
+    
     except Exception as e:
         print(f"An error occurred: {e}")
-    
+
+def add_gs_to_colmap_folders(path, iteration_num="5_000"):
+    """
+    Add a GS to every colmap folder
+    """
+
+    subdirs = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+
+    for dir in subdirs:
+        # Check that dir contains COLMAP data
+        if all([f != "sparse" for f in os.listdir(os.path.join(path,dir))]):
+            print(f"Missing colmap data: {dir}")
+            continue
+
+        # Check that there isn't already a gs in folder
+        if os.path.isdir(os.path.join(path, dir, "point_cloud", f"iteration_{iteration_num}")):
+            print(f"Already a GS in {dir}")
+            continue
+
+        # Generate gaussian splat
+        print(f"Generating GS for {dir}")
+        generate_gs_for_folder(os.path.join(path, dir), iteration_num=iteration_num, network_gui=False)
+            
 
 def add_colmap_to_category_folders(path):
     """
@@ -70,26 +92,36 @@ def add_colmap_to_category_folders(path):
     # Iterate through each folder
     for sequence_name, frame_annotations in sequence_frame_annotations.items():
 
-        if sequence_name != "106_12653_23216":
-            continue
-
         cameras_list = []
         images_list = []
+
+        if not os.path.isdir(os.path.join(path, sequence_name)):
+            print(f"Could not find {sequence_name}")
+            continue
+
+        if not os.path.exists(os.path.join(path, sequence_name, "pointcloud.ply")):
+            print(f"Point cloud doesn't exist in {sequence_name}")
+            continue
 
         for frame_annotation in frame_annotations:
 
             # Get camera data
+            width = frame_annotation.image.size[1]
+            height = frame_annotation.image.size[0]
+            s = (min(height, width) - 1) / 2
+            # fx = 2 * (width - 1) / frame_annotation.viewpoint.focal_length[1]
+            fy = (width - 1) * frame_annotation.viewpoint.focal_length[0] / 2
+            px = -frame_annotation.viewpoint.principal_point[0] * s + (width - 1) / 2
+            py = -frame_annotation.viewpoint.principal_point[1] * s + (height - 1) / 2
             camera_data = {
                 "camera_id": len(cameras_list) + 1,
                 "model": "PINHOLE",
-                "width": frame_annotation.image.size[0],
-                "height": frame_annotation.image.size[1],
-                "focal_length": frame_annotation.viewpoint.focal_length[0],
-                "principal_point": frame_annotation.viewpoint.principal_point
+                "width": width,
+                "height": height,
+                "focal_length_x": fy,
+                "focal_length_y": fy,
+                "principal_point": (px, py)
             }
-
-            if frame_annotation.viewpoint.focal_length[0] != frame_annotation.viewpoint.focal_length[1]:
-                raise ValueError("Focal length is not the same for x and y.")
 
             # Check if camera_data already exists in cameras_list
             duplicate_index = None
@@ -97,7 +129,8 @@ def add_colmap_to_category_folders(path):
                 if (existing_camera['model'] == camera_data['model'] and
                     existing_camera['width'] == camera_data['width'] and
                     existing_camera['height'] == camera_data['height'] and
-                    existing_camera['focal_length'] == camera_data['focal_length'] and
+                    existing_camera['focal_length_x'] == camera_data['focal_length_x'] and
+                    existing_camera['focal_length_y'] == camera_data['focal_length_y'] and
                     existing_camera['principal_point'] == camera_data['principal_point']):
                     duplicate_index = i
                     break
@@ -110,15 +143,17 @@ def add_colmap_to_category_folders(path):
                 camera_data['camera_id'] = cameras_list[duplicate_index]['camera_id']
             
             image_quaternion = _convert_rotation_to_quaternion(np.array(frame_annotation.viewpoint.R))
+            T = np.array(frame_annotation.viewpoint.T)
+            T[:2] *= -1
             image_data = {
                 "image_id": frame_annotation.frame_number,
                 "qw": image_quaternion[0],
                 "qx": image_quaternion[1],
                 "qy": image_quaternion[2],
                 "qz": image_quaternion[3],
-                "tx": frame_annotation.viewpoint.T[0],
-                "ty": frame_annotation.viewpoint.T[1],
-                "tz": frame_annotation.viewpoint.T[2],
+                "tx": T[0],
+                "ty": T[1],
+                "tz": T[2],
                 "camera_id": camera_data['camera_id'],
                 "image_name": frame_annotation.image.path.split('/')[-1]
             }
@@ -144,8 +179,40 @@ def add_colmap_to_category_folders(path):
 
         print(f"Added COLMAP data to {sequence_name}")
 
-        break
-    
+        remove_background_from_images(path, sequence_name)
+
+        print(f"Removed background from images in {sequence_name}")
+
+
+
+def remove_background_from_images(path: str, sequence_name: str):
+    images_path = os.path.join(path, sequence_name, "images")
+    masks_path = os.path.join(path, sequence_name, "masks")
+
+    for image_name in os.listdir(images_path):
+        if image_name.endswith(".jpg"):
+            image_path = os.path.join(images_path, image_name)
+            mask_name = image_name.replace(".jpg", ".png")
+            mask_path = os.path.join(masks_path, mask_name)
+
+            # Read the image and mask
+            image = cv2.imread(image_path)
+            mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+
+            if image is None or mask is None:
+                raise Exception(f"Could not read image or mask for {image_name}")
+                continue
+
+            # Create a 3-channel mask
+            mask_3_channel = cv2.merge([mask, mask, mask])
+
+            # Remove the background
+            image_no_bg = cv2.bitwise_and(image, mask_3_channel)
+
+            # Save the image back to the images folder
+            cv2.imwrite(image_path, image_no_bg)
+
+
 
 def _get_camera_txt(cameras_list: List[dict]):
     """
@@ -161,7 +228,8 @@ def _get_camera_txt(cameras_list: List[dict]):
             f"{camera_data['model']} " +
             f"{camera_data['width']} " +
             f"{camera_data['height']} " +
-            f"{camera_data['focal_length']} " +
+            f"{camera_data['focal_length_x']} " +
+            f"{camera_data['focal_length_y']} " +
             f"{camera_data['principal_point'][0]} " +
             f"{camera_data['principal_point'][1]}\n"
         )
@@ -199,9 +267,26 @@ def _get_image_txt(images_list: List[dict]):
     image_txt = image_txt[:-1]
     
     return image_txt
+
+def _adjust_pitch_by_degrees(q, pitch_degrees):
+    pitch_radians = np.deg2rad(pitch_degrees)
+    q_pitch = np.array([np.cos(pitch_radians / 2), np.sin(pitch_radians / 2), 0, 0])
+    
+    # Quaternion multiplication (q_pitch * q)
+    w1, x1, y1, z1 = q_pitch
+    w2, x2, y2, z2 = q
+    
+    q_new = np.array([
+        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2
+    ])
+    
+    return q_new
     
 
-def _convert_rotation_to_quaternion(rotation: np.ndarray) -> np.ndarray:
+def _convert_rotation_to_quaternion(R: np.ndarray) -> np.ndarray:
     """
     Convert a 3x3 rotation matrix to a quaternion.
     
@@ -211,34 +296,51 @@ def _convert_rotation_to_quaternion(rotation: np.ndarray) -> np.ndarray:
     Returns:
         numpy.ndarray: Quaternion in the form [w, x, y, z]
     """
+
+    R[:, :2] *= -1
     
-    trace = np.trace(rotation)
-    if trace > 0:
-        S = np.sqrt(trace + 1.0) * 2
-        w = 0.25 * S
-        x = (rotation[2, 1] - rotation[1, 2]) / S
-        y = (rotation[0, 2] - rotation[2, 0]) / S
-        z = (rotation[1, 0] - rotation[0, 1]) / S
-    elif rotation[0, 0] > rotation[1, 1] and rotation[0, 0] > rotation[2, 2]:
-        S = np.sqrt(1.0 + rotation[0, 0] - rotation[1, 1] - rotation[2, 2]) * 2
-        w = (rotation[2, 1] - rotation[1, 2]) / S
-        x = 0.25 * S
-        y = (rotation[0, 1] + rotation[1, 0]) / S
-        z = (rotation[0, 2] + rotation[2, 0]) / S
-    elif rotation[1, 1] > rotation[2, 2]:
-        S = np.sqrt(1.0 + rotation[1, 1] - rotation[0, 0] - rotation[2, 2]) * 2
-        w = (rotation[0, 2] - rotation[2, 0]) / S
-        x = (rotation[0, 1] + rotation[1, 0]) / S
-        y = 0.25 * S
-        z = (rotation[1, 2] + rotation[2, 1]) / S
-    else:
-        S = np.sqrt(1.0 + rotation[2, 2] - rotation[0, 0] - rotation[1, 1]) * 2
-        w = (rotation[1, 0] - rotation[0, 1]) / S
-        x = (rotation[0, 2] + rotation[2, 0]) / S
-        y = (rotation[1, 2] + rotation[2, 1]) / S
-        z = 0.25 * S
     
-    return np.array([w, x, y, z])
+    # Rxx, Ryx, Rzx, Rxy, Ryy, Rzy, Rxz, Ryz, Rzz = R.flat
+    Rxx, Rxy, Rxz, Ryx, Ryy, Ryz, Rzx, Rzy, Rzz = R.flat
+    K = np.array([
+        [Rxx - Ryy - Rzz, 0, 0, 0],
+        [Ryx + Rxy, Ryy - Rxx - Rzz, 0, 0],
+        [Rzx + Rxz, Rzy + Ryz, Rzz - Rxx - Ryy, 0],
+        [Ryz - Rzy, Rzx - Rxz, Rxy - Ryx, Rxx + Ryy + Rzz]]) / 3.0
+    eigvals, eigvecs = np.linalg.eigh(K)
+    qvec = eigvecs[[3, 0, 1, 2], np.argmax(eigvals)]
+    if qvec[0] < 0:
+        qvec *= -1
+    
+    return qvec
+    
+    # trace = np.trace(rotation)
+    # if trace > 0:
+    #     S = np.sqrt(trace + 1.0) * 2
+    #     w = 0.25 * S
+    #     x = (rotation[2, 1] - rotation[1, 2]) / S
+    #     y = (rotation[0, 2] - rotation[2, 0]) / S
+    #     z = (rotation[1, 0] - rotation[0, 1]) / S
+    # elif rotation[0, 0] > rotation[1, 1] and rotation[0, 0] > rotation[2, 2]:
+    #     S = np.sqrt(1.0 + rotation[0, 0] - rotation[1, 1] - rotation[2, 2]) * 2
+    #     w = (rotation[2, 1] - rotation[1, 2]) / S
+    #     x = 0.25 * S
+    #     y = (rotation[0, 1] + rotation[1, 0]) / S
+    #     z = (rotation[0, 2] + rotation[2, 0]) / S
+    # elif rotation[1, 1] > rotation[2, 2]:
+    #     S = np.sqrt(1.0 + rotation[1, 1] - rotation[0, 0] - rotation[2, 2]) * 2
+    #     w = (rotation[0, 2] - rotation[2, 0]) / S
+    #     x = (rotation[0, 1] + rotation[1, 0]) / S
+    #     y = 0.25 * S
+    #     z = (rotation[1, 2] + rotation[2, 1]) / S
+    # else:
+    #     S = np.sqrt(1.0 + rotation[2, 2] - rotation[0, 0] - rotation[1, 1]) * 2
+    #     w = (rotation[1, 0] - rotation[0, 1]) / S
+    #     x = (rotation[0, 2] + rotation[2, 0]) / S
+    #     y = (rotation[1, 2] + rotation[2, 1]) / S
+    #     z = 0.25 * S
+    
+    # return np.array([w, x, y, z])
 
 def _convert_ply_to_points3D(ply_file):
     # Read the .ply file
@@ -271,3 +373,4 @@ def _convert_ply_to_points3D(ply_file):
         points3D_txt += line + "\n"
 
     return points3D_txt
+
