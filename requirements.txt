@@ -9,3 +9,5 @@ tensorboard
 datasets
 pandas
 transformers
+python-dotenv
+huggingface-hub
