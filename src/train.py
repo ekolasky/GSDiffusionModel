@@ -3,13 +3,15 @@ import torch.nn as nn
 import torch.optim as optim
 import argparse
 from tqdm.notebook import tqdm
+from datetime import datetime
+import os
 from src.gs_utils.gs_dataset_utils import load_gs_dataset, GSDataset
 from src.model.modeling_gst import GSTModel, GSTConfig
-from src.gs_utils.training_utils import add_noise, loss_fn, cosine_beta_schedule
+from src.gs_utils.training_utils import create_noise_input_vecs, loss_fn
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def train_diffusion_model(model, train_dataloader, eval_dataloader, training_args):
+def train_diffusion_model(model, train_dataloader, eval_dataloader, training_args, save_model=True):
     optimizer = optim.Adam(model.parameters(), lr=training_args.lr)
     total_steps = len(train_dataloader) * training_args.epochs
     scheduler = optim.lr_scheduler.LinearLR(
@@ -24,7 +26,11 @@ def train_diffusion_model(model, train_dataloader, eval_dataloader, training_arg
             optimizer.zero_grad()
 
             batch = batch.to(device)
-            noisy_data, weight = add_noise(batch)
+            noisy_data, weight = create_noise_input_vecs(
+                batch,
+                None,
+                model.config
+            )
 
             noisy_data = noisy_data.to(device)
             outputs = model(noisy_data)
@@ -45,7 +51,12 @@ def train_diffusion_model(model, train_dataloader, eval_dataloader, training_arg
         with torch.no_grad():
             for batch in tqdm(eval_dataloader):
                 batch = batch.to(device)
-                noisy_data, weight = add_noise(batch)
+                noisy_data, weight = create_noise_input_vecs(
+                    batch,
+                    None,
+                    model
+                )
+                noisy_data = noisy_data.to(device)
                 outputs = model(noisy_data)
                 loss = loss_fn(outputs, batch, weight)
                 eval_loss += loss.item()
@@ -53,6 +64,24 @@ def train_diffusion_model(model, train_dataloader, eval_dataloader, training_arg
         print(f"Eval Loss: {eval_loss/len(eval_dataloader):.4f}")
     
     print("Training Complete")
+
+    if save_model:
+        # Create a directory with the current timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_dir = os.path.join("checkpoints", timestamp)
+        os.makedirs(save_dir, exist_ok=True)
+
+        # Save the model state dict
+        model_path = os.path.join(save_dir, "gs_model.pth")
+        torch.save(model.state_dict(), model_path)
+
+        # Save the model configuration
+        config_path = os.path.join(save_dir, "config.json")
+        model.config.save_pretrained(config_path)
+
+        print(f"Model and config saved in {save_dir}")
+        torch.save(model.state_dict(), "/checkpoints/gs_model.pth")
+        print("Model saved")
 
 
 class TrainingArguments:
@@ -72,6 +101,12 @@ def main():
     parser.add_argument("--batch_size", type=int, default=8)
     args = parser.parse_args()
 
+    training_args = TrainingArguments(
+        epochs=args.epochs,
+        lr=args.lr,
+        batch_size=args.batch_size
+    )
+
     # Load the dataset
     train_dataset, test_dataset = load_gs_dataset()
 
@@ -90,11 +125,7 @@ def main():
     train_diffusion_model(model,
         train_dataloader,
         test_dataloader,
-        TrainingArguments(
-            epochs=args.epochs,
-            lr=args.lr,
-            batch_size=args.batch_size
-        )
+        training_args
     )
 
     # Save the model
