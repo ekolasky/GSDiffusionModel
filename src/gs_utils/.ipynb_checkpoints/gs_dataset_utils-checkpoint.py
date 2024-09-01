@@ -8,7 +8,7 @@ import os
 from huggingface_hub import login
 
 load_dotenv()
-login(token="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")#os.getenv("HF_TOKEN"))
+login(token=os.getenv("HF_TOKEN"))
 
 
 def download_gs_dataset():
