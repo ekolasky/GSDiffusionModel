@@ -44,12 +44,10 @@ def main():
                     ply_file_path = f"{full_subdir}/point_cloud/{iteration_dirs[-1]}/point_cloud.ply"
     
                     df = convert_ply_to_df(ply_file_path)
-                    print(df)
                     examples.append(df)
-                    break
 
     # Convert list of examples to a datasets.Dataset
-
+    print(len(examples))
     upload_gs_dataset(examples, split_ratio=0.8)
 
 

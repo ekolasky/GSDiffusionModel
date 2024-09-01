@@ -6,7 +6,7 @@ from typing import List
 import os
 import subprocess
 import numpy as np
-from plyfile import PlyData
+from plyfile import PlyData, PlyElement
 import cv2
 import sys
 from co3d.dataset.data_types import (
@@ -212,6 +212,38 @@ def remove_background_from_images(path: str, sequence_name: str):
             # Save the image back to the images folder
             cv2.imwrite(image_path, image_no_bg)
 
+def remove_shs_from_models(path):
+
+    print("In rm")
+    subdirs = [name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
+
+    for dir in subdirs:
+        print(os.path.join(path, dir))
+        if os.path.isdir(os.path.join(path, dir, "point_cloud/iteration_5000/")):
+
+            print(f"Overwriting dir: {dir}")
+            
+            ply_file_path = os.path.join(path, dir, "point_cloud/iteration_5000/point_cloud.ply")
+            ply_data = PlyData.read(ply_file_path)
+            
+            vertex_data = ply_data['vertex'].data
+            modified_vertex_data = []
+            for row in vertex_data:
+                modified_row = list(row)  # Convert to list to make it mutable
+                for i, name in enumerate(vertex_data.dtype.names):
+                    if name in [f"f_rest_{i}" for i in range(45)]:
+                        modified_row[i] = 0  # Set SH data to zero
+                modified_vertex_data.append(tuple(modified_row))  # Convert back to tuple
+            
+            # Convert modified data back to a numpy structured array
+            modified_vertex_data = np.array(modified_vertex_data, dtype=vertex_data.dtype)
+            vertex_element = PlyElement.describe(modified_vertex_data, 'vertex')
+
+            modified_ply_data = PlyData([vertex_element], text=ply_data.text)
+            modified_ply_data.write(ply_file_path)
+
+            print(f"Finished overwriting: {dir}")
+            
 
 
 def _get_camera_txt(cameras_list: List[dict]):

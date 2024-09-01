@@ -1,7 +1,15 @@
-from datasets import load_dataset, Dataset
+from datasets import load_dataset, Dataset, DatasetDict
 import pandas as pd
 import math
 from plyfile import PlyData
+from huggingface_hub import login
+from dotenv import load_dotenv
+import os
+from huggingface_hub import login
+
+load_dotenv()
+login(token=os.getenv("HF_TOKEN"))
+
 
 def download_gs_dataset():
     dataset = load_dataset("rotten_tomatoes")
@@ -37,7 +45,7 @@ def upload_gs_dataset(examples, split_ratio=0.8):
     # Format examples for uploading
     formatted_examples = []
     for i, example in enumerate(examples):
-        formatted_examples.append({"idx": i, points: [row.tolist() for _, row in df.iterrows()]}
+        formatted_examples.append({"idx": i, "points": [row.tolist() for _, row in example.iterrows()]})
 
     # Load existing dataset
     # train_dataset, test_dataset = load_gs_dataset()
@@ -46,19 +54,21 @@ def upload_gs_dataset(examples, split_ratio=0.8):
     # df = pd.concat([train_dataset, test_dataset])
 
     # Split the dataset into train and test
-    train_set = Dataset.from_list(formated_examples[:math.ceil(len(formated_examples)*split_ratio)])
-    test_set = Dataset.from_list(formated_examples[math.ceil(len(formated_examples)*split_ratio):])
+    train_set = Dataset.from_list(formatted_examples[:math.ceil(len(formatted_examples)*split_ratio)])
+    test_set = Dataset.from_list(formatted_examples[math.ceil(len(formatted_examples)*split_ratio):])
 
     # Replace csv files with new datasets
     # train_dataset.to_csv("data/labeled_gs/train.csv", index=False)
     # test_dataset.to_csv("data/labeled_gs/test.csv", index=False)
 
     # Upload to Hugging Face
+    print("Uploading to HF...")
     dataset_dict = DatasetDict({
         "train": train_set,
         "test": test_set
     })
 
-    dataset_dict.push_to_hub(repo_id=repo_id)
+    dataset_dict.push_to_hub(repo_id="ekolasky/gaussian-splat-hydrants")
+    print("Finished uploading")
 
     
