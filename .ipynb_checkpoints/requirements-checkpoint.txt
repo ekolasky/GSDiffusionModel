@@ -6,3 +6,6 @@ torchaudio
 torchvision
 opencv-python
 tensorboard
+datasets
+pandas
+transformers
