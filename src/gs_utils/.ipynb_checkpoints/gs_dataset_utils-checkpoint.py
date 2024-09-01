@@ -8,7 +8,7 @@ import os
 from huggingface_hub import login
 
 load_dotenv()
-login(token=os.getenv("HF_TOKEN"))
+login(token="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")
 
 
 def download_gs_dataset():
@@ -43,9 +43,9 @@ def convert_ply_to_df(ply_file_path):
 def upload_gs_dataset(examples, split_ratio=0.8):
 
     # Format examples for uploading
-    formatted_examples = []
-    for i, example in enumerate(examples):
-        formatted_examples.append({"idx": i, "points": [row.tolist() for _, row in example.iterrows()]})
+    # formatted_examples = []
+    # for i, example in enumerate(examples):
+    #     formatted_examples.append({"idx": i, "points": [row.tolist() for _, row in example.iterrows()]})
 
     # Load existing dataset
     # train_dataset, test_dataset = load_gs_dataset()
@@ -54,8 +54,8 @@ def upload_gs_dataset(examples, split_ratio=0.8):
     # df = pd.concat([train_dataset, test_dataset])
 
     # Split the dataset into train and test
-    train_set = Dataset.from_list(formatted_examples[:math.ceil(len(formatted_examples)*split_ratio)])
-    test_set = Dataset.from_list(formatted_examples[math.ceil(len(formatted_examples)*split_ratio):])
+    train_set = Dataset.from_list(examples[:math.ceil(len(examples)*split_ratio)])
+    test_set = Dataset.from_list(examples[math.ceil(len(examples)*split_ratio):])
 
     # Replace csv files with new datasets
     # train_dataset.to_csv("data/labeled_gs/train.csv", index=False)

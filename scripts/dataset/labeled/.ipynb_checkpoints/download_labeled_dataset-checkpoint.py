@@ -28,7 +28,7 @@ def process_category(category, links):
     
     # Download and unzip files
     # for link in tqdm(category_links, desc=f"Downloading {category} data"):
-    i = 4
+    i = 5
     link = category_links[i]
     zip_filename = os.path.join(category_path, os.path.basename(link))
     

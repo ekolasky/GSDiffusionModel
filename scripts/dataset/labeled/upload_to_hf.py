@@ -5,6 +5,8 @@ import json
 import sys
 import os
 from src.gs_utils.gs_dataset_utils import convert_ply_to_df, upload_gs_dataset
+from huggingface_hub import login
+
 
 def main():
 
@@ -32,6 +34,7 @@ def main():
         for batchdir in [f for f in os.listdir(category_dir) if os.path.isdir(category_dir + "/" + f)]:
             full_batchdir = category_dir + "/" + batchdir
             for subdir in [f for f in os.listdir(full_batchdir) if os.path.isdir(full_batchdir + "/" + f)]:
+                print(f"Converting: {subdir}")
             
                 # Check if dir includes point_cloud/iteration_xxxx
                 full_subdir = category_dir + "/" + batchdir + "/" + subdir
@@ -44,10 +47,9 @@ def main():
                     ply_file_path = f"{full_subdir}/point_cloud/{iteration_dirs[-1]}/point_cloud.ply"
     
                     df = convert_ply_to_df(ply_file_path)
-                    examples.append(df)
+                    examples.append({"id": subdir, "points": [row.tolist() for _, row in df.iterrows()]})
 
     # Convert list of examples to a datasets.Dataset
-    print(len(examples))
     upload_gs_dataset(examples, split_ratio=0.8)
 
 

@@ -59,8 +59,8 @@ def main():
         category_path = os.path.join('data/labeled_gs/raw', category)
         for folder in [f for f in os.listdir(category_path) if os.path.isdir(os.path.join(category_path, f))]:
             print(f"Processing folder: {os.path.join(category_path, folder)}")
-            add_colmap_to_category_folders(os.path.join(category_path, folder))
-            add_gs_to_colmap_folders(os.path.join(category_path, folder), iteration_num="5_000")
+            # add_colmap_to_category_folders(os.path.join(category_path, folder))
+            # add_gs_to_colmap_folders(os.path.join(category_path, folder), iteration_num="5_000")
             # generate_gs_for_folder(os.path.join(category_path, folder, "106_12677_24990"), iteration_num="5_000")
             remove_shs_from_models(os.path.join(category_path, folder))
         
