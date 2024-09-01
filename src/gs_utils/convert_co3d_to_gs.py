@@ -145,7 +145,7 @@ def add_colmap_to_category_folders(path):
         print(f"Added COLMAP data to {sequence_name}")
 
         break
-    
+
 
 def _get_camera_txt(cameras_list: List[dict]):
     """
