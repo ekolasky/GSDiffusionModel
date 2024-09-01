@@ -2,8 +2,10 @@ import torch
 from torch import nn
 import numpy as np
     
-    
 
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
 
 def loss_fn(outputs, inputs, weight):
     """
@@ -42,18 +44,20 @@ def _rearrange_outputs(outputs, inputs):
     return rearranged_outputs
 
 
-def add_noise(batch, 
-        max_level_pos=1,
-        max_level_color=1,
-        max_level_opacity=1,
-        max_level_scale=1,
-        max_level_rot=1
+def create_noise_input_vecs(
+        batch = None, 
+        t = None,
+        config = None
     ):
 
-    diffusion_steps, alphas_cumprod = cosine_beta_schedule(250)
+    diffusion_steps, alphas_cumprod = cosine_beta_schedule(config.timesteps)
+
+    if batch is None:
+        batch = torch.zeros(1, config.max_length, config.input_size).to(device)
 
     # Add Gaussian noise to the batch data
-    t = torch.randint(0, 250, (batch.shape[0],))
+    if t is None:
+        t = torch.randint(0, config.timesteps, (batch.shape[0],))
     noise_level = diffusion_steps[t]
     noise_level = torch.tensor(noise_level, device=batch.device).unsqueeze(1).unsqueeze(2)
 
@@ -63,14 +67,14 @@ def add_noise(batch,
     
     # Create noise vector with the same batch size and length as batch
     batch_size, seq_length, _ = batch.shape
-    noise = torch.zeros(batch_size, seq_length, 14, device=batch.device)
+    noise = torch.zeros(batch_size, seq_length, config.input_size, device=batch.device)
 
     # Apply noise to specific elements
-    noise[:, :, 0:3] = torch.randn_like(noise[:, :, 0:3]) * (noise_level * max_level_pos)
-    noise[:, :, 3:6] = torch.randn_like(noise[:, :, 3:6]) * (noise_level * max_level_color)
-    noise[:, :, 6:7] = torch.randn_like(noise[:, :, 6:7]) * (noise_level * max_level_opacity)
-    noise[:, :, 7:10] = torch.randn_like(noise[:, :, 7:10]) * (noise_level * max_level_scale)
-    noise[:, :, 10:14] = torch.randn_like(noise[:, :, 10:14]) * (noise_level * max_level_rot)
+    noise[:, :, 0:3] = torch.randn_like(noise[:, :, 0:3]) * (noise_level * config.max_level_pos)
+    noise[:, :, 3:6] = torch.randn_like(noise[:, :, 3:6]) * (noise_level * config.max_level_color)
+    noise[:, :, 6:7] = torch.randn_like(noise[:, :, 6:7]) * (noise_level * config.max_level_opacity)
+    noise[:, :, 7:10] = torch.randn_like(noise[:, :, 7:10]) * (noise_level * config.max_level_scale)
+    noise[:, :, 10:14] = torch.randn_like(noise[:, :, 10:14]) * (noise_level * config.max_level_rot)
     return batch + noise, weight
 
 
