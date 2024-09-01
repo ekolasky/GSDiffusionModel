@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import argparse
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from datetime import datetime
 import os
 from src.gs_utils.gs_dataset_utils import load_gs_dataset, GSDataset
@@ -54,7 +54,7 @@ def train_diffusion_model(model, train_dataloader, eval_dataloader, training_arg
                 noisy_data, weight = create_noise_input_vecs(
                     batch,
                     None,
-                    model
+                    model.config
                 )
                 noisy_data = noisy_data.to(device)
                 outputs = model(noisy_data)
