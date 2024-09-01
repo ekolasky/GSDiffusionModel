@@ -1,3 +1,2 @@
-notebooks/gh_token.txt
-data/labeled_gs/raw
-.env
+
+data/labeled_gs/processed
