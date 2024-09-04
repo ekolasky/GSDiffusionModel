@@ -11,6 +11,7 @@ import json
 import requests
 import zipfile
 from tqdm import tqdm
+from typing import List
 import shutil
 from co3d.dataset.data_types import (
     load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
@@ -96,20 +97,20 @@ def process_category(category, links):
     for link in tqdm(category_links, desc=f"Processing {len(category_links)} batches"):
 
         # Download batch
-        download_category_batch(category, link)
+        download_category_batch(category_path, link)
 
-        # Get sequence names in folder
         # Get frame annotations
-        frame_annotations = load_dataclass_jgzip(os.path.join(path, "frame_annotations.jgz"), List[FrameAnnotation])
+        frame_annotations = load_dataclass_jgzip(os.path.join(category_path, "frame_annotations.jgz"), List[FrameAnnotation])
         
 
         # Get sequence names in folder, along with corresponding frame annotations
         sequence_frame_annotations = {}
-        for frame_annotation in frame_annotations:
+        for frame_annotation in tqdm(frame_annotations, desc="Sorting frame annotations"):
+            
             if os.path.isdir(os.path.join(category_path, frame_annotation.sequence_name)):
 
                 # Check that sequence folder has pointcloud.ply
-                if not os.path.exists(os.path.join(path, sequence_name, "pointcloud.ply")):
+                if not os.path.exists(os.path.join(category_path, sequence_name, "pointcloud.ply")):
                     add_to_log(f"{sequence_name}: Point cloud doesn't exist")
                     continue
 
