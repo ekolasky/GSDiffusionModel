@@ -12,24 +12,14 @@ import requests
 import zipfile
 from tqdm import tqdm
 import shutil
+from co3d.dataset.data_types import (
+    load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
+)
 
-def process_category(category, links):
-    print(f"Processing category: {category}")
-    
-    if category not in links['full']:
-        print(f"Error: Category '{category}' not found in links.json")
-        return
-    
-    category_links = links['full'][category]
-    
-    # Create category folder
-    category_path = os.path.join('data/labeled_gs/raw', category)
-    os.makedirs(category_path, exist_ok=True)
-    
-    # Download and unzip files
-    # for link in tqdm(category_links, desc=f"Downloading {category} data"):
-    i = 5
-    link = category_links[i]
+from src.gs_utils.convert_co3d_to_gs import add_colmap_to_sequence_folder, generate_gs_for_folder, remove_shs_from_model
+
+def download_category_batch(category, links):
+    # Download the batch data
     zip_filename = os.path.join(category_path, os.path.basename(link))
     
     # Download zip file
@@ -55,6 +45,113 @@ def process_category(category, links):
     
     # Remove zip file after extraction
     os.remove(zip_filename)
+
+
+def process_category(category, links):
+    """
+    Processing each category does the following steps:
+    - Get the links for the category
+    - Create a folder for the category
+    - Create a log file, along with function to add to log file
+    - For each batch in the category:
+        - Download the batch data
+        - Unzip the batch data
+        - Delete the zip file
+        - Add COLMAP to batch data
+        - Add GS to COLMAP data
+        - Remove shs from models
+        - Transfer models to labeled_gs/processed
+        - Delete original batch data
+    """
+
+
+    print(f"Processing category: {category}")
+    
+    # Get links for the category
+    if category not in links['full']:
+        print(f"Error: Category '{category}' not found in links.json")
+        return
+    category_links = links['full'][category]
+    
+    # Create category folder
+    category_path = os.path.join('data/labeled_gs/raw', category)
+    os.makedirs(category_path, exist_ok=True)
+
+    # Create log file
+    log_file = os.path.join(category_path, 'log.txt')
+    def add_to_log(message):
+        with open(log_file, 'a') as f:
+            f.write(message + '\n')
+
+    # Process each batch
+    for link in tqdm(category_links, desc=f"Processing {len(category_links)} batches"):
+
+        # Download batch
+        download_category_batch(category, link)
+
+        # Get sequence names in folder
+        # Get frame annotations
+        frame_annotations = load_dataclass_jgzip(os.path.join(path, "frame_annotations.jgz"), List[FrameAnnotation])
+        
+
+        # Get sequence names in folder, along with corresponding frame annotations
+        sequence_frame_annotations = {}
+        for frame_annotation in frame_annotations:
+            if os.path.isdir(os.path.join(category_path, frame_annotation.sequence_name)):
+
+                # Check that sequence folder has pointcloud.ply
+                if not os.path.exists(os.path.join(path, sequence_name, "pointcloud.ply")):
+                    add_to_log(f"{sequence_name}: Point cloud doesn't exist")
+                    continue
+
+                # Add frame annotation to dictionary
+                if frame_annotation.sequence_name not in sequence_frame_annotations:
+                    sequence_frame_annotations[frame_annotation.sequence_name] = [frame_annotation]
+                sequence_frame_annotations[frame_annotation.sequence_name].append(frame_annotation)
+        original_seq_names = [k for k in sequence_frame_annotations.keys()]
+
+        # Add COLMAP to sequence folders
+        for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Preprocessing sequences"):
+            try:
+                add_colmap_to_sequence_folder(os.path.join(category_path, frame_annotation.sequence_name), frame_annotations)
+            except Exception as e:
+                add_to_log(f"{sequence_name}: Failed during COLMAP")
+                sequence_frame_annotations.pop(sequence_name)
+
+        # Add GS to COLMAP data
+        for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Adding GS to COLMAP data"):
+            try:
+                generate_gs_for_folder(os.path.join(category_path, sequence_name))
+            except Exception as e:
+                add_to_log(f"{sequence_name}: Failed during GS")
+                sequence_frame_annotations.pop(sequence_name)
+
+        # Remove shs from models
+        for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Removing shs from models"):
+            try:
+                remove_shs_from_model(category_path)
+                add_to_log(f"{sequence_name}: Success")
+            except Exception as e:
+                add_to_log(f"{sequence_name}: Failed during shs removal")
+                sequence_frame_annotations.pop(sequence_name)
+
+        # Transfer models to labeled_gs/processed
+        for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Moving models to processed folder"):
+            # Create sequence folder in labeled_gs/processed
+            sequence_path = os.path.join('data/labeled_gs/processed', category, sequence_name)
+            os.makedirs(sequence_path, exist_ok=True)
+
+            # Move models to sequence folder
+            shutil.move(
+                os.path.join(category_path, sequence_name, "point_cloud/iteration_5000/point_cloud.ply"),
+                os.path.join(sequence_path, "pointcloud.ply")
+            )
+
+        # Delete original batch data
+        for seq_name in original_seq_names:
+            shutil.rmtree(os.path.join(category_path, seq_name))
+
+
     
     print(f"Finished processing category: {category}")
 
@@ -68,6 +165,7 @@ def main():
         links = json.load(f)
         available_categories = [k for k in links["full"].keys()]
 
+    # Get the categories to process
     if args.category:
         if args.category not in available_categories:
             print(f"Error: Category '{args.category}' not found in available categories.")
@@ -77,15 +175,11 @@ def main():
     else:
         categories_to_process = available_categories
 
-    # Check if raw path exists and if it does delete any folders that we're replacing
+    # Check if raw path exists and if it does throw an error
     if not os.path.isdir('data/labeled_gs/raw'):
         os.makedirs('data/labeled_gs/raw', exist_ok=True)
-    # else:
-    #     for category in categories_to_process:
-    #         category_path = os.path.join('data/labeled_gs/raw', category)
-    #         if os.path.isdir(category_path):
-    #             print(f"Deleting: ${category_path}")
-    #             shutil.rmtree(category_path)
+    else:
+        raise ValueError("data/labeled_gs/raw already exists")
                 
 
     print(f"Categories to process: {', '.join(categories_to_process)}")

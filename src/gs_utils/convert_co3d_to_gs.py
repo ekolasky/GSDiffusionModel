@@ -14,7 +14,7 @@ from co3d.dataset.data_types import (
 )
 
 
-def generate_gs_for_folder(folder_path, iteration_num, network_gui=False):
+def generate_gs_for_folder(folder_path, iteration_num="5_000", network_gui=False):
     """
     Add GS data to a folder with CO3D data and corresponding COLMAP data.
     """
@@ -72,116 +72,95 @@ def add_gs_to_colmap_folders(path, iteration_num="5_000"):
         generate_gs_for_folder(os.path.join(path, dir), iteration_num=iteration_num, network_gui=False)
             
 
-def add_colmap_to_category_folders(path):
+def add_colmap_to_sequence_folder(sequence_folder, frame_annotations):
     """
     Add COLMAP data to a folder with CO3D data.
     """
 
-    # Get frame annotations
-    frame_annotations = load_dataclass_jgzip(os.path.join(path, "frame_annotations.jgz"), List[FrameAnnotation])
+    sequence_name = sequence_folder.split("/")[-1]
 
     cameras_list = []
+    images_list = []
 
-    # Seperate frame annotations by sequence name
-    sequence_frame_annotations = {}
     for frame_annotation in frame_annotations:
-        if frame_annotation.sequence_name not in sequence_frame_annotations:
-            sequence_frame_annotations[frame_annotation.sequence_name] = []
-        sequence_frame_annotations[frame_annotation.sequence_name].append(frame_annotation)
 
-    # Iterate through each folder
-    for sequence_name, frame_annotations in sequence_frame_annotations.items():
+        # Get camera data
+        width = frame_annotation.image.size[1]
+        height = frame_annotation.image.size[0]
+        s = (min(height, width) - 1) / 2
+        # fx = 2 * (width - 1) / frame_annotation.viewpoint.focal_length[1]
+        fy = (width - 1) * frame_annotation.viewpoint.focal_length[0] / 2
+        px = -frame_annotation.viewpoint.principal_point[0] * s + (width - 1) / 2
+        py = -frame_annotation.viewpoint.principal_point[1] * s + (height - 1) / 2
+        camera_data = {
+            "camera_id": len(cameras_list) + 1,
+            "model": "PINHOLE",
+            "width": width,
+            "height": height,
+            "focal_length_x": fy,
+            "focal_length_y": fy,
+            "principal_point": (px, py)
+        }
 
-        cameras_list = []
-        images_list = []
-
-        if not os.path.isdir(os.path.join(path, sequence_name)):
-            print(f"Could not find {sequence_name}")
-            continue
-
-        if not os.path.exists(os.path.join(path, sequence_name, "pointcloud.ply")):
-            print(f"Point cloud doesn't exist in {sequence_name}")
-            continue
-
-        for frame_annotation in frame_annotations:
-
-            # Get camera data
-            width = frame_annotation.image.size[1]
-            height = frame_annotation.image.size[0]
-            s = (min(height, width) - 1) / 2
-            # fx = 2 * (width - 1) / frame_annotation.viewpoint.focal_length[1]
-            fy = (width - 1) * frame_annotation.viewpoint.focal_length[0] / 2
-            px = -frame_annotation.viewpoint.principal_point[0] * s + (width - 1) / 2
-            py = -frame_annotation.viewpoint.principal_point[1] * s + (height - 1) / 2
-            camera_data = {
-                "camera_id": len(cameras_list) + 1,
-                "model": "PINHOLE",
-                "width": width,
-                "height": height,
-                "focal_length_x": fy,
-                "focal_length_y": fy,
-                "principal_point": (px, py)
-            }
-
-            # Check if camera_data already exists in cameras_list
-            duplicate_index = None
-            for i, existing_camera in enumerate(cameras_list):
-                if (existing_camera['model'] == camera_data['model'] and
-                    existing_camera['width'] == camera_data['width'] and
-                    existing_camera['height'] == camera_data['height'] and
-                    existing_camera['focal_length_x'] == camera_data['focal_length_x'] and
-                    existing_camera['focal_length_y'] == camera_data['focal_length_y'] and
-                    existing_camera['principal_point'] == camera_data['principal_point']):
-                    duplicate_index = i
-                    break
-            
-            if duplicate_index is None:
-                # No duplicate found, add the new camera_data
-                cameras_list.append(camera_data)
-            else:
-                # Duplicate found, update camera_data's camera_id
-                camera_data['camera_id'] = cameras_list[duplicate_index]['camera_id']
-            
-            image_quaternion = _convert_rotation_to_quaternion(np.array(frame_annotation.viewpoint.R))
-            T = np.array(frame_annotation.viewpoint.T)
-            T[:2] *= -1
-            image_data = {
-                "image_id": frame_annotation.frame_number,
-                "qw": image_quaternion[0],
-                "qx": image_quaternion[1],
-                "qy": image_quaternion[2],
-                "qz": image_quaternion[3],
-                "tx": T[0],
-                "ty": T[1],
-                "tz": T[2],
-                "camera_id": camera_data['camera_id'],
-                "image_name": frame_annotation.image.path.split('/')[-1]
-            }
-            images_list.append(image_data)
-
-
-        image_txt = _get_image_txt(images_list)
-        camera_txt = _get_camera_txt(cameras_list)
-        points3D_txt = _convert_ply_to_points3D(os.path.join(path, sequence_name, "pointcloud.ply"))
-
+        # Check if camera_data already exists in cameras_list
+        duplicate_index = None
+        for i, existing_camera in enumerate(cameras_list):
+            if (existing_camera['model'] == camera_data['model'] and
+                existing_camera['width'] == camera_data['width'] and
+                existing_camera['height'] == camera_data['height'] and
+                existing_camera['focal_length_x'] == camera_data['focal_length_x'] and
+                existing_camera['focal_length_y'] == camera_data['focal_length_y'] and
+                existing_camera['principal_point'] == camera_data['principal_point']):
+                duplicate_index = i
+                break
         
-        metadata_path = os.path.join(path, sequence_name, "sparse", "0")
-        os.makedirs(metadata_path, exist_ok=True)
+        if duplicate_index is None:
+            # No duplicate found, add the new camera_data
+            cameras_list.append(camera_data)
+        else:
+            # Duplicate found, update camera_data's camera_id
+            camera_data['camera_id'] = cameras_list[duplicate_index]['camera_id']
+        
+        image_quaternion = _convert_rotation_to_quaternion(np.array(frame_annotation.viewpoint.R))
+        T = np.array(frame_annotation.viewpoint.T)
+        T[:2] *= -1
+        image_data = {
+            "image_id": frame_annotation.frame_number,
+            "qw": image_quaternion[0],
+            "qx": image_quaternion[1],
+            "qy": image_quaternion[2],
+            "qz": image_quaternion[3],
+            "tx": T[0],
+            "ty": T[1],
+            "tz": T[2],
+            "camera_id": camera_data['camera_id'],
+            "image_name": frame_annotation.image.path.split('/')[-1]
+        }
+        images_list.append(image_data)
 
-        with open(os.path.join(metadata_path, "cameras.txt"), "w") as f:
-            f.write(camera_txt)
 
-        with open(os.path.join(metadata_path, "images.txt"), "w") as f:
-            f.write(image_txt)
+    image_txt = _get_image_txt(images_list)
+    camera_txt = _get_camera_txt(cameras_list)
+    points3D_txt = _convert_ply_to_points3D(os.path.join(path, sequence_name, "pointcloud.ply"))
 
-        with open(os.path.join(metadata_path, "points3D.txt"), "w") as f:
-            f.write(points3D_txt)
+    
+    metadata_path = os.path.join(path, sequence_name, "sparse", "0")
+    os.makedirs(metadata_path, exist_ok=True)
 
-        print(f"Added COLMAP data to {sequence_name}")
+    with open(os.path.join(metadata_path, "cameras.txt"), "w") as f:
+        f.write(camera_txt)
 
-        remove_background_from_images(path, sequence_name)
+    with open(os.path.join(metadata_path, "images.txt"), "w") as f:
+        f.write(image_txt)
 
-        print(f"Removed background from images in {sequence_name}")
+    with open(os.path.join(metadata_path, "points3D.txt"), "w") as f:
+        f.write(points3D_txt)
+
+    print(f"Added COLMAP data to {sequence_name}")
+
+    remove_background_from_images(path, sequence_name)
+
+    print(f"Removed background from images in {sequence_name}")
 
 
 
@@ -212,37 +191,29 @@ def remove_background_from_images(path: str, sequence_name: str):
             # Save the image back to the images folder
             cv2.imwrite(image_path, image_no_bg)
 
-def remove_shs_from_models(path):
+def remove_shs_from_model(sequence_folder):
 
-    print("In rm")
-    subdirs = [name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
 
-    for dir in subdirs:
-        print(os.path.join(path, dir))
-        if os.path.isdir(os.path.join(path, dir, "point_cloud/iteration_5000/")):
+    if os.path.isdir(os.path.join(sequence_folder, "point_cloud/iteration_5000/")):
+        
+        ply_file_path = os.path.join(sequence_folder, "point_cloud/iteration_5000/point_cloud.ply")
+        ply_data = PlyData.read(ply_file_path)
+        
+        vertex_data = ply_data['vertex'].data
+        modified_vertex_data = []
+        for row in vertex_data:
+            modified_row = list(row)  # Convert to list to make it mutable
+            for i, name in enumerate(vertex_data.dtype.names):
+                if name in [f"f_rest_{i}" for i in range(45)]:
+                    modified_row[i] = 0  # Set SH data to zero
+            modified_vertex_data.append(tuple(modified_row))  # Convert back to tuple
+        
+        # Convert modified data back to a numpy structured array
+        modified_vertex_data = np.array(modified_vertex_data, dtype=vertex_data.dtype)
+        vertex_element = PlyElement.describe(modified_vertex_data, 'vertex')
 
-            print(f"Overwriting dir: {dir}")
-            
-            ply_file_path = os.path.join(path, dir, "point_cloud/iteration_5000/point_cloud.ply")
-            ply_data = PlyData.read(ply_file_path)
-            
-            vertex_data = ply_data['vertex'].data
-            modified_vertex_data = []
-            for row in vertex_data:
-                modified_row = list(row)  # Convert to list to make it mutable
-                for i, name in enumerate(vertex_data.dtype.names):
-                    if name in [f"f_rest_{i}" for i in range(45)]:
-                        modified_row[i] = 0  # Set SH data to zero
-                modified_vertex_data.append(tuple(modified_row))  # Convert back to tuple
-            
-            # Convert modified data back to a numpy structured array
-            modified_vertex_data = np.array(modified_vertex_data, dtype=vertex_data.dtype)
-            vertex_element = PlyElement.describe(modified_vertex_data, 'vertex')
-
-            modified_ply_data = PlyData([vertex_element], text=ply_data.text)
-            modified_ply_data.write(ply_file_path)
-
-            print(f"Finished overwriting: {dir}")
+        modified_ply_data = PlyData([vertex_element], text=ply_data.text)
+        modified_ply_data.write(ply_file_path)
             
 
 

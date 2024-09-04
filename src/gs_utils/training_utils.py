@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import numpy as np
+from src.model.modeling_gst import NoiseLevels
     
 
 
@@ -70,11 +71,11 @@ def create_noise_input_vecs(
     noise = torch.zeros(batch_size, seq_length, config.input_size, device=batch.device)
 
     # Apply noise to specific elements
-    noise[:, :, 0:3] = torch.randn_like(noise[:, :, 0:3]) * (noise_level * config.max_level_pos)
-    noise[:, :, 3:6] = torch.randn_like(noise[:, :, 3:6]) * (noise_level * config.max_level_color)
-    noise[:, :, 6:7] = torch.randn_like(noise[:, :, 6:7]) * (noise_level * config.max_level_opacity)
-    noise[:, :, 7:10] = torch.randn_like(noise[:, :, 7:10]) * (noise_level * config.max_level_scale)
-    noise[:, :, 10:14] = torch.randn_like(noise[:, :, 10:14]) * (noise_level * config.max_level_rot)
+    noise[:, :, 0:3] = torch.randn_like(noise[:, :, 0:3]) * (noise_level * config.noise_levels.max_level_pos)
+    noise[:, :, 3:6] = torch.randn_like(noise[:, :, 3:6]) * (noise_level * config.noise_levels.max_level_color)
+    noise[:, :, 6:7] = torch.randn_like(noise[:, :, 6:7]) * (noise_level * config.noise_levels.max_level_opacity)
+    noise[:, :, 7:10] = torch.randn_like(noise[:, :, 7:10]) * (noise_level * config.noise_levels.max_level_scale)
+    noise[:, :, 10:14] = torch.randn_like(noise[:, :, 10:14]) * (noise_level * config.noise_levels.max_level_rot)
     return batch + noise, weight
 
 
