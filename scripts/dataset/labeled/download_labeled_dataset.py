@@ -11,6 +11,7 @@ import json
 import requests
 import zipfile
 from tqdm import tqdm
+from typing import List
 import shutil
 from co3d.dataset.data_types import (
     load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
@@ -18,7 +19,7 @@ from co3d.dataset.data_types import (
 
 from src.gs_utils.convert_co3d_to_gs import add_colmap_to_sequence_folder, generate_gs_for_folder, remove_shs_from_model
 
-def download_category_batch(category, links):
+def download_category_batch(category_path, link):
     # Download the batch data
     zip_filename = os.path.join(category_path, os.path.basename(link))
     
@@ -42,6 +43,15 @@ def download_category_batch(category, links):
         total_files = len(zip_ref.infolist())  # Total number of files to extract
         for file in tqdm(zip_ref.infolist(), total=total_files, desc="Extracting"):
             zip_ref.extract(file, category_path)
+
+            # Move files from potential subfolder to category_path
+            extracted_path = os.path.join(category_path, file.filename)
+            if os.path.isfile(extracted_path):
+                shutil.move(extracted_path, category_path)
+            elif os.path.isdir(extracted_path):
+                for item in os.listdir(extracted_path):
+                    shutil.move(os.path.join(extracted_path, item), category_path)
+                os.rmdir(extracted_path)
     
     # Remove zip file after extraction
     os.remove(zip_filename)
@@ -87,20 +97,20 @@ def process_category(category, links):
     for link in tqdm(category_links, desc=f"Processing {len(category_links)} batches"):
 
         # Download batch
-        download_category_batch(category, link)
+        download_category_batch(category_path, link)
 
-        # Get sequence names in folder
         # Get frame annotations
-        frame_annotations = load_dataclass_jgzip(os.path.join(path, "frame_annotations.jgz"), List[FrameAnnotation])
+        frame_annotations = load_dataclass_jgzip(os.path.join(category_path, "frame_annotations.jgz"), List[FrameAnnotation])
         
 
         # Get sequence names in folder, along with corresponding frame annotations
         sequence_frame_annotations = {}
-        for frame_annotation in frame_annotations:
+        for frame_annotation in tqdm(frame_annotations, desc="Sorting frame annotations"):
+            
             if os.path.isdir(os.path.join(category_path, frame_annotation.sequence_name)):
 
                 # Check that sequence folder has pointcloud.ply
-                if not os.path.exists(os.path.join(path, sequence_name, "pointcloud.ply")):
+                if not os.path.exists(os.path.join(category_path, sequence_name, "pointcloud.ply")):
                     add_to_log(f"{sequence_name}: Point cloud doesn't exist")
                     continue
 
