@@ -18,7 +18,7 @@ from co3d.dataset.data_types import (
 
 from src.gs_utils.convert_co3d_to_gs import add_colmap_to_sequence_folder, generate_gs_for_folder, remove_shs_from_model
 
-def download_category_batch(category, links):
+def download_category_batch(category_path, link):
     # Download the batch data
     zip_filename = os.path.join(category_path, os.path.basename(link))
     
@@ -42,6 +42,15 @@ def download_category_batch(category, links):
         total_files = len(zip_ref.infolist())  # Total number of files to extract
         for file in tqdm(zip_ref.infolist(), total=total_files, desc="Extracting"):
             zip_ref.extract(file, category_path)
+
+            # Move files from potential subfolder to category_path
+            extracted_path = os.path.join(category_path, file.filename)
+            if os.path.isfile(extracted_path):
+                shutil.move(extracted_path, category_path)
+            elif os.path.isdir(extracted_path):
+                for item in os.listdir(extracted_path):
+                    shutil.move(os.path.join(extracted_path, item), category_path)
+                os.rmdir(extracted_path)
     
     # Remove zip file after extraction
     os.remove(zip_filename)
