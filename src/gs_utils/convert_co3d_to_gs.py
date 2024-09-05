@@ -10,7 +10,7 @@ from plyfile import PlyData, PlyElement
 import cv2
 import sys
 from co3d.dataset.data_types import (
-load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
+    load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
 )
 
 def generate_gs_for_folder(folder_path, iteration_num="5_000", network_gui=False):

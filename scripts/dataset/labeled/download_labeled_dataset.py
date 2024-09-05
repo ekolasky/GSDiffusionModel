@@ -12,7 +12,7 @@ from tqdm import tqdm
 from typing import List
 import shutil
 from co3d.dataset.data_types import (
-load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
+    load_dataclass_jgzip, FrameAnnotation, SequenceAnnotation
 )
 
 from src.gs_utils.convert_co3d_to_gs import add_colmap_to_sequence_folder, generate_gs_for_folder, remove_shs_from_model
@@ -82,7 +82,7 @@ def process_category(category, links):
 
     # Create category folder
     category_path = os.path.join('data/labeled_gs/raw', category)
-    # os.makedirs(category_path, exist_ok=True)
+    os.makedirs(category_path, exist_ok=True)
 
     # Create log file
     log_file = os.path.join(category_path, 'log.txt')
@@ -94,7 +94,7 @@ def process_category(category, links):
     for link in tqdm(category_links, desc=f"Processing {len(category_links)} batches"):
 
         # Download batch
-        # download_category_batch(category_path, link)
+        download_category_batch(category_path, link)
 
         # Get frame annotations
         frame_annotations = load_dataclass_jgzip(os.path.join(category_path, "frame_annotations.jgz"), List[FrameAnnotation])
@@ -119,15 +119,15 @@ def process_category(category, links):
                 sequence_frame_annotations[sequence_name].append(frame_annotation)
 
         # Add COLMAP to sequence folders
-        # failed_seqs = []
-        # for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Preprocessing sequences"):
-        #     try:
-        #         add_colmap_to_sequence_folder(os.path.join(category_path, sequence_name), frame_annotations)
-        #     except Exception as e:
-        #         print(e)
-        #         add_to_log(f"{sequence_name}: Failed during COLMAP")
-        #         failed_seqs.append(sequence_name)
-        # sequence_frame_annotations = {key: value for key, value in sequence_frame_annotations.items() if key not in failed_seqs}
+        failed_seqs = []
+        for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Preprocessing sequences"):
+            try:
+                add_colmap_to_sequence_folder(os.path.join(category_path, sequence_name), frame_annotations)
+            except Exception as e:
+                print(e)
+                add_to_log(f"{sequence_name}: Failed during COLMAP")
+                failed_seqs.append(sequence_name)
+        sequence_frame_annotations = {key: value for key, value in sequence_frame_annotations.items() if key not in failed_seqs}
 
         # Add GS to COLMAP data
         failed_seqs = []
@@ -189,10 +189,10 @@ def main():
         categories_to_process = available_categories
 
     # Check if raw path exists and if it does throw an error
-    # if not os.path.isdir('data/labeled_gs/raw'):
-    #     os.makedirs('data/labeled_gs/raw', exist_ok=True)
-    # else:
-    #     raise ValueError("data/labeled_gs/raw already exists")
+    if not os.path.isdir('data/labeled_gs/raw'):
+        os.makedirs('data/labeled_gs/raw', exist_ok=True)
+    else:
+        raise ValueError("data/labeled_gs/raw already exists")
 
     print(f"Categories to process: {', '.join(categories_to_process)}")
 
