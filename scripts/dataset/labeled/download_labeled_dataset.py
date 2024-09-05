@@ -52,7 +52,7 @@ def download_category_batch(category_path, link):
     os.remove(zip_filename)
 
     # Remove empty category folder
-    os.remove(os.path.join(category_path, category))
+    shutil.rmtree(os.path.join(category_path, category))
 
 
 def process_category(category, links):
