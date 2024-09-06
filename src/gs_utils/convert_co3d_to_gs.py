@@ -216,7 +216,7 @@ def _get_camera_txt(cameras_list: List[dict]):
     """
 
     # Create camera.bin
-    camera_txt = f"# Camera list with one line of data per camera:\\n#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[6]\\n# Number of cameras: {len(cameras_list)}\\n"
+    camera_txt = f"# Camera list with one line of data per camera:\n#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[6]\n# Number of cameras: {len(cameras_list)}\n"
 
     for camera_data in cameras_list:
         camera_txt += (
@@ -227,7 +227,7 @@ def _get_camera_txt(cameras_list: List[dict]):
             f"{camera_data['focal_length_x']} " +
             f"{camera_data['focal_length_y']} " +
             f"{camera_data['principal_point'][0]} " +
-            f"{camera_data['principal_point'][1]}\\n"
+            f"{camera_data['principal_point'][1]}\n"
         )
 
     # Remove the last newline character
@@ -241,10 +241,10 @@ def _get_image_txt(images_list: List[dict]):
     Get the image.txt file from a frame annotation.
     """
 
-    image_txt = "# Image list with two lines of data per image:\\n"
-    image_txt += "#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\\n"
-    image_txt += "#   POINTS2D[] as (X, Y, POINT3D_ID)\\n"
-    image_txt += f"# Number of images: {len(images_list)}, mean observations per image: {2500}\\n"
+    image_txt = "# Image list with two lines of data per image:\n"
+    image_txt += "#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n"
+    image_txt += "#   POINTS2D[] as (X, Y, POINT3D_ID)\n"
+    image_txt += f"# Number of images: {len(images_list)}, mean observations per image: {2500}\n"
 
     for image_data in images_list:
         image_txt += (
@@ -257,7 +257,7 @@ def _get_image_txt(images_list: List[dict]):
             f"{image_data['ty']} " +
             f"{image_data['tz']} " +
             f"{image_data['camera_id']} " +
-            f"{image_data['image_name']}\\n\\n"
+            f"{image_data['image_name']}\n\n"
         )
 
     image_txt = image_txt[:-1]
@@ -356,9 +356,9 @@ def _convert_ply_to_points3D(ply_file):
         r = g = b = [255] * len(x)  # Default color if not available
 
     # Open the output file
-    points3D_txt = "# 3D point list with one line of data per point:\\n"
-    points3D_txt += "#   POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)\\n"
-    points3D_txt += f"# Number of points: {len(x)}, mean track length: 0.0\\n"
+    points3D_txt = "# 3D point list with one line of data per point:\n"
+    points3D_txt += "#   POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)\n"
+    points3D_txt += f"# Number of points: {len(x)}, mean track length: 0.0\n"
 
     for i in range(len(x)):
         # Assign POINT3D_ID and ERROR (can be set to a default value like 0.0)
@@ -367,6 +367,6 @@ def _convert_ply_to_points3D(ply_file):
         # Prepare the line for points3D.txt
         line = f"{point_id} {x[i]} {y[i]} {z[i]} {r[i]} {g[i]} {b[i]} {error}"
         # If you have TRACK data, you can append it here. Otherwise, leave it empty.
-        points3D_txt += line + "\\n"
+        points3D_txt += line + "\n"
 
     return points3D_txt
