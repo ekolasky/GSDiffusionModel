@@ -4,12 +4,8 @@ import math
 import torch
 from plyfile import PlyData
 from huggingface_hub import login
-from dotenv import load_dotenv
 import os
 from huggingface_hub import login
-
-load_dotenv()
-login(token="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")
 
 
 
@@ -45,26 +41,11 @@ def convert_ply_to_df(ply_file_path):
     df = df[['x', 'y', 'z', 'f_dc_0', 'f_dc_1', 'f_dc_2', 'opacity', 'scale_0', 'scale_1', 'scale_2', 'rot_0', 'rot_1', 'rot_2', 'rot_3']]
     return df
 
-# def upload_gs_dataset(examples, split_ratio=0.8):
-
-    # Format examples for uploading
-    formatted_examples = []
-    for i, example in enumerate(examples):
-        formatted_examples.append({"idx": i, "points": [row.tolist() for _, row in example.iterrows()]})
-
-#     # Load existing dataset
-#     # train_dataset, test_dataset = load_gs_dataset()
-
-#     # Merge train and test datasets, add new examples, and split
-#     # df = pd.concat([train_dataset, test_dataset])
+def upload_gs_dataset(examples, split_ratio=0.8):
 
     # Split the dataset into train and test
-    train_set = Dataset.from_list(formatted_examples[:math.ceil(len(formatted_examples)*split_ratio)])
-    test_set = Dataset.from_list(formatted_examples[math.ceil(len(formatted_examples)*split_ratio):])
-
-#     # Replace csv files with new datasets
-#     # train_dataset.to_csv("data/labeled_gs/train.csv", index=False)
-#     # test_dataset.to_csv("data/labeled_gs/test.csv", index=False)
+    train_set = Dataset.from_list(examples[:math.ceil(len(examples)*split_ratio)])
+    test_set = Dataset.from_list(examples[math.ceil(len(examples)*split_ratio):])
 
     # Upload to Hugging Face
     print("Uploading to HF...")

@@ -12,7 +12,10 @@ def main():
 
     parser = argparse.ArgumentParser(description="Process CO3D dataset into Gaussian Splats.")
     parser.add_argument('--category', type=str, help='Specific category to process (optional)')
+    parser.add_argument('--hf_token', type=str, help='Specific category to process (optional)')
     args = parser.parse_args()
+
+    login(token=args.hf_token)
 
     with open('data/labeled_gs/links.json', 'r') as f:
         links = json.load(f)
@@ -30,24 +33,18 @@ def main():
 
     examples = []
     for category in categories_to_process:
-        category_dir = f"data/labeled_gs/raw/{category}"
-        for batchdir in [f for f in os.listdir(category_dir) if os.path.isdir(category_dir + "/" + f)]:
-            full_batchdir = category_dir + "/" + batchdir
-            for subdir in [f for f in os.listdir(full_batchdir) if os.path.isdir(full_batchdir + "/" + f)]:
-                print(f"Converting: {subdir}")
-            
-                # Check if dir includes point_cloud/iteration_xxxx
-                full_subdir = category_dir + "/" + batchdir + "/" + subdir
-                print(subdir)
-                if os.path.exists(f"{full_subdir}/point_cloud") and \
-                    any([f for f in os.listdir(f"{full_subdir}/point_cloud") if f.startswith("iteration_")]):
-                    # Get ply file from largest iteration
-                    iteration_dirs = [f for f in os.listdir(f"{full_subdir}/point_cloud") if f.startswith("iteration_")]
-                    iteration_dirs.sort(key=lambda x: int(x.split("_")[1]))
-                    ply_file_path = f"{full_subdir}/point_cloud/{iteration_dirs[-1]}/point_cloud.ply"
-    
-                    df = convert_ply_to_df(ply_file_path)
-                    examples.append({"id": subdir, "points": [row.tolist() for _, row in df.iterrows()]})
+        category_dir = f"data/labeled_gs/processed/{category}"
+        for subdir in [f for f in os.listdir(category_dir) if os.path.isdir(category_dir + "/" + f)]:
+            print(f"Converting: {subdir}")
+        
+            # Check if dir includes point_cloud/iteration_xxxx
+            full_subdir = category_dir + "/" + subdir
+            ply_file_path = full_subdir + "/pointcloud.ply"
+            print(ply_file_path)
+            if os.path.exists(ply_file_path):
+
+                df = convert_ply_to_df(ply_file_path)
+                examples.append({"id": subdir, "points": [row.tolist() for _, row in df.iterrows()]})
 
     # Convert list of examples to a datasets.Dataset
     upload_gs_dataset(examples, split_ratio=0.8)

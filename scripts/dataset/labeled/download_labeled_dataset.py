@@ -55,7 +55,100 @@ def download_category_batch(category_path, link):
     shutil.rmtree(os.path.join(category_path, category))
 
 
-def process_category(category, links):
+def get_frame_annotations(category_path, add_to_log):
+    # Get frame annotations
+    frame_annotations = load_dataclass_jgzip(os.path.join(category_path, "frame_annotations.jgz"), List[FrameAnnotation])
+
+    # Get sequence names in folder, along with corresponding frame annotations
+    sequence_frame_annotations = {}
+    error_seqs = []
+    for frame_annotation in tqdm(frame_annotations, desc="Sorting frame annotations"):
+
+        sequence_name = frame_annotation.sequence_name
+        if os.path.isdir(os.path.join(category_path, sequence_name)):
+
+            # Check that sequence folder has pointcloud.ply
+            if not os.path.exists(os.path.join(category_path, sequence_name, "pointcloud.ply")):
+                if sequence_name not in error_seqs:
+                    add_to_log(f"{sequence_name}: Point cloud doesn't exist")
+                continue
+
+            # Check that sequence folder has "sparse/0" folder
+            if all([f != "sparse" for f in os.listdir(os.path.join(category_path, sequence_name))]):
+                continue
+
+            # Check that sequence folder doesn't already have gs
+            if os.path.isdir(os.path.join(category_path, sequence_name, "point_cloud", f"iteration_5000"):
+                continue
+
+            # Add frame annotation to dictionary
+            if frame_annotation.sequence_name not in sequence_frame_annotations:
+                sequence_frame_annotations[sequence_name] = [frame_annotation]
+            sequence_frame_annotations[sequence_name].append(frame_annotation)
+    
+    return sequence_frame_annotations
+
+
+def add_colmap_to_folders(sequence_frame_annotations, category_path, add_to_log):
+    # Add COLMAP to sequence folders
+    failed_seqs = []
+    for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Preprocessing sequences"):
+        try:
+            add_colmap_to_sequence_folder(os.path.join(category_path, sequence_name), frame_annotations)
+        except Exception as e:
+            print(e)
+            add_to_log(f"{sequence_name}: Failed during COLMAP")
+            failed_seqs.append(sequence_name)
+    sequence_frame_annotations = {key: value for key, value in sequence_frame_annotations.items() if key not in failed_seqs}
+
+    return sequence_frame_annotations
+
+def add_gs_to_folders(sequence_frame_annotations, category_path, add_to_log):
+    # Add GS to COLMAP data
+    failed_seqs = []
+    for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Adding GS to COLMAP data"):
+        try:
+            generate_gs_for_folder(os.path.join(category_path, sequence_name))
+        except Exception as e:
+            add_to_log(f"{sequence_name}: Failed during GS")
+            failed_seqs.append(sequence_name)
+    sequence_frame_annotations = {key: value for key, value in sequence_frame_annotations.items() if key not in failed_seqs}
+
+    return sequence_frame_annotations
+
+def remove_shs_from_models(sequence_frame_annotations, category_path, add_to_log):
+    failed_seqs = []
+    for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Removing shs from models"):
+        try:
+            remove_shs_from_model(category_path)
+            add_to_log(f"{sequence_name}: Success")
+        except Exception as e:
+            add_to_log(f"{sequence_name}: Failed during shs removal")
+            failed_seqs.append(sequence_name)
+    sequence_frame_annotations = {key: value for key, value in sequence_frame_annotations.items() if key not in failed_seqs}
+
+    return sequence_frame_annotations
+
+def transfer_and_delete(sequence_frame_annotations, category_path):
+    # Transfer models to labeled_gs/processed
+    category = category_path.split('/')[-1]
+    for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Moving models to processed folder"):
+        # Create sequence folder in labeled_gs/processed
+        sequence_path = os.path.join('data/labeled_gs/processed', category, sequence_name)
+        os.makedirs(sequence_path, exist_ok=True)
+
+        # Move models to sequence folder
+        shutil.move(
+            os.path.join(category_path, sequence_name, "point_cloud/iteration_5000/point_cloud.ply"),
+            os.path.join(sequence_path, "pointcloud.ply")
+        )
+
+    # Delete original batch data
+    for seq_name in [k for k in sequence_frame_annotations.keys()]:
+        shutil.rmtree(os.path.join(category_path, seq_name))
+
+
+def process_category(category, links, start_batch=0):
     """
     Processing each category does the following steps:
     - Get the links for the category
@@ -73,6 +166,8 @@ def process_category(category, links):
     """
 
     print(f"Processing category: {category}")
+    print(start_batch)
+    return
 
     # Get links for the category
     if category not in links['full']:
@@ -82,7 +177,8 @@ def process_category(category, links):
 
     # Create category folder
     category_path = os.path.join('data/labeled_gs/raw', category)
-    os.makedirs(category_path, exist_ok=True)
+    if (start_batch == 0):
+        os.makedirs(category_path, exist_ok=True)
 
     # Create log file
     log_file = os.path.join(category_path, 'log.txt')
@@ -90,81 +186,27 @@ def process_category(category, links):
         with open(log_file, 'a') as f:
             f.write(message + '\\n')
 
+    # # If start_batch isn't 0, finish processing any folders in dir
+    # if start_batch != 0:
+    #     sequence_frame_annotations = get_frame_annotations(category_path, add_to_log)
+    #     sequence_frame_annotations = add_gs_to_folders(sequence_frame_annotations, category_path, add_to_log)
+    #     sequence_frame_annotations = remove_shs_from_models(sequence_frame_annotations, category_path, add_to_log)
+    #     transfer_and_delete(sequence_frame_annotations, category_path)
+        
     # Process each batch
-    for link in tqdm(category_links, desc=f"Processing {len(category_links)} batches"):
+    for i in tqdm(range(0, len(category_links)), desc=f"Processing {len(category_links)} batches", 
+        initial=start_batch, total=len(category_links)):
+        
+        link = category_links[i]
+        print(i)
 
-        # Download batch
-        download_category_batch(category_path, link)
-
-        # Get frame annotations
-        frame_annotations = load_dataclass_jgzip(os.path.join(category_path, "frame_annotations.jgz"), List[FrameAnnotation])
-
-        # Get sequence names in folder, along with corresponding frame annotations
-        sequence_frame_annotations = {}
-        seqs_wo_pointcloud = []
-        for frame_annotation in tqdm(frame_annotations, desc="Sorting frame annotations"):
-
-            sequence_name = frame_annotation.sequence_name
-            if os.path.isdir(os.path.join(category_path, sequence_name)):
-
-                # Check that sequence folder has pointcloud.ply
-                if not os.path.exists(os.path.join(category_path, sequence_name, "pointcloud.ply")):
-                    if sequence_name not in seqs_wo_pointcloud:
-                        add_to_log(f"{sequence_name}: Point cloud doesn't exist")
-                    continue
-
-                # Add frame annotation to dictionary
-                if frame_annotation.sequence_name not in sequence_frame_annotations:
-                    sequence_frame_annotations[sequence_name] = [frame_annotation]
-                sequence_frame_annotations[sequence_name].append(frame_annotation)
-
-        # Add COLMAP to sequence folders
-        failed_seqs = []
-        for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Preprocessing sequences"):
-            try:
-                add_colmap_to_sequence_folder(os.path.join(category_path, sequence_name), frame_annotations)
-            except Exception as e:
-                print(e)
-                add_to_log(f"{sequence_name}: Failed during COLMAP")
-                failed_seqs.append(sequence_name)
-        sequence_frame_annotations = {key: value for key, value in sequence_frame_annotations.items() if key not in failed_seqs}
-
-        # Add GS to COLMAP data
-        failed_seqs = []
-        for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Adding GS to COLMAP data"):
-            try:
-                generate_gs_for_folder(os.path.join(category_path, sequence_name))
-            except Exception as e:
-                add_to_log(f"{sequence_name}: Failed during GS")
-                failed_seqs.append(sequence_name)
-        sequence_frame_annotations = {key: value for key, value in sequence_frame_annotations.items() if key not in failed_seqs}
-
-        # Remove shs from models
-        failed_seqs = []
-        for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Removing shs from models"):
-            try:
-                remove_shs_from_model(category_path)
-                add_to_log(f"{sequence_name}: Success")
-            except Exception as e:
-                add_to_log(f"{sequence_name}: Failed during shs removal")
-                failed_seqs.append(sequence_name)
-        sequence_frame_annotations = {key: value for key, value in sequence_frame_annotations.items() if key not in failed_seqs}
-
-        # Transfer models to labeled_gs/processed
-        for sequence_name, frame_annotations in tqdm(sequence_frame_annotations.items(), desc="Moving models to processed folder"):
-            # Create sequence folder in labeled_gs/processed
-            sequence_path = os.path.join('data/labeled_gs/processed', category, sequence_name)
-            os.makedirs(sequence_path, exist_ok=True)
-
-            # Move models to sequence folder
-            shutil.move(
-                os.path.join(category_path, sequence_name, "point_cloud/iteration_5000/point_cloud.ply"),
-                os.path.join(sequence_path, "pointcloud.ply")
-            )
-
-        # Delete original batch data
-        for seq_name in [k for k in sequence_frame_annotations.keys()]:
-            shutil.rmtree(os.path.join(category_path, seq_name))
+        # Process batch
+        # download_category_batch(category_path, link)
+        # sequence_frame_annotations = get_frame_annotations(category_path, add_to_log)
+        # sequence_frame_annotations = add_colmap_to_folders(sequence_frame_annotations, category_path, add_to_log)
+        # sequence_frame_annotations = add_gs_to_folders(sequence_frame_annotations, category_path, add_to_log)
+        # sequence_frame_annotations = remove_shs_from_models(sequence_frame_annotations, category_path, add_to_log)
+        # transfer_and_delete(sequence_frame_annotations, category_path)
 
         print(f"Finished processing category: {category}")
 
@@ -172,6 +214,7 @@ def process_category(category, links):
 def main():
     parser = argparse.ArgumentParser(description="Process CO3D dataset into Gaussian Splats.")
     parser.add_argument('--category', type=str, help='Specific category to process (optional)')
+    parser.add_argument('--start_batch', type=int, help='Batch number to resume at (optional)')
     args = parser.parse_args()
 
     with open('data/labeled_gs/links.json', 'r') as f:
@@ -197,7 +240,7 @@ def main():
     print(f"Categories to process: {', '.join(categories_to_process)}")
 
     for category in categories_to_process:
-        process_category(category, links)
+        process_category(category, links, start_batch=args.start_batch)
 
 
 if __name__ == "__main__":
