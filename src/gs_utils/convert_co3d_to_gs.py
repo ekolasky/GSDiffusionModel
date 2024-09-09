@@ -18,9 +18,6 @@ def generate_gs_for_folder(folder_path, iteration_num="5_000", network_gui=False
     Add GS data to a folder with CO3D data and corresponding COLMAP data.
     """
     script_path = os.path.join("submodules", "gaussian-splatting", "train.py")
-    print(os.path.abspath(script_path))
-    print(os.path.abspath(folder_path))
-
     script_args = ["python", script_path, "-s", folder_path, "--model_path", os.path.abspath(folder_path)]
 
     if iteration_num:

@@ -73,19 +73,19 @@ def get_frame_annotations(category_path, add_to_log):
                     add_to_log(f"{sequence_name}: Point cloud doesn't exist")
                 continue
 
-            # Check that sequence folder has "sparse/0" folder
-            if all([f != "sparse" for f in os.listdir(os.path.join(category_path, sequence_name))]):
+            # Check that sequence folder does not have "sparse/0" folder
+            if any([f == "sparse" for f in os.listdir(os.path.join(category_path, sequence_name))]):
                 continue
 
             # Check that sequence folder doesn't already have gs
-            if os.path.isdir(os.path.join(category_path, sequence_name, "point_cloud", f"iteration_5000"):
+            if os.path.isdir(os.path.join(category_path, sequence_name, "point_cloud", f"iteration_5000")):
                 continue
 
             # Add frame annotation to dictionary
             if frame_annotation.sequence_name not in sequence_frame_annotations:
                 sequence_frame_annotations[sequence_name] = [frame_annotation]
             sequence_frame_annotations[sequence_name].append(frame_annotation)
-    
+
     return sequence_frame_annotations
 
 
@@ -166,8 +166,6 @@ def process_category(category, links, start_batch=0):
     """
 
     print(f"Processing category: {category}")
-    print(start_batch)
-    return
 
     # Get links for the category
     if category not in links['full']:
@@ -194,27 +192,26 @@ def process_category(category, links, start_batch=0):
     #     transfer_and_delete(sequence_frame_annotations, category_path)
         
     # Process each batch
-    for i in tqdm(range(0, len(category_links)), desc=f"Processing {len(category_links)} batches", 
+    for i in tqdm(range(start_batch, len(category_links)), desc=f"Processing {len(category_links)} batches", 
         initial=start_batch, total=len(category_links)):
         
         link = category_links[i]
-        print(i)
+        print(link)
 
         # Process batch
-        # download_category_batch(category_path, link)
-        # sequence_frame_annotations = get_frame_annotations(category_path, add_to_log)
-        # sequence_frame_annotations = add_colmap_to_folders(sequence_frame_annotations, category_path, add_to_log)
-        # sequence_frame_annotations = add_gs_to_folders(sequence_frame_annotations, category_path, add_to_log)
-        # sequence_frame_annotations = remove_shs_from_models(sequence_frame_annotations, category_path, add_to_log)
-        # transfer_and_delete(sequence_frame_annotations, category_path)
-
-        print(f"Finished processing category: {category}")
+        if i != 5:
+            download_category_batch(category_path, link)
+        sequence_frame_annotations = get_frame_annotations(category_path, add_to_log)
+        sequence_frame_annotations = add_colmap_to_folders(sequence_frame_annotations, category_path, add_to_log)
+        sequence_frame_annotations = add_gs_to_folders(sequence_frame_annotations, category_path, add_to_log)
+        sequence_frame_annotations = remove_shs_from_models(sequence_frame_annotations, category_path, add_to_log)
+        transfer_and_delete(sequence_frame_annotations, category_path)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Process CO3D dataset into Gaussian Splats.")
     parser.add_argument('--category', type=str, help='Specific category to process (optional)')
-    parser.add_argument('--start_batch', type=int, help='Batch number to resume at (optional)')
+    parser.add_argument('--start_batch', type=int, default=0, help='Batch number to resume at (optional)')
     args = parser.parse_args()
 
     with open('data/labeled_gs/links.json', 'r') as f:
@@ -232,10 +229,11 @@ def main():
         categories_to_process = available_categories
 
     # Check if raw path exists and if it does throw an error
-    if not os.path.isdir('data/labeled_gs/raw'):
-        os.makedirs('data/labeled_gs/raw', exist_ok=True)
-    else:
-        raise ValueError("data/labeled_gs/raw already exists")
+    if args.start_batch == 0:
+        if not os.path.isdir('data/labeled_gs/raw'):
+            os.makedirs('data/labeled_gs/raw', exist_ok=True)
+        else:
+            raise ValueError("data/labeled_gs/raw already exists")
 
     print(f"Categories to process: {', '.join(categories_to_process)}")
 
