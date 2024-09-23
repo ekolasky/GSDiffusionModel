@@ -1,6 +1,7 @@
 [submodule "submodules/gaussian-splatting"]
 	path = submodules/gaussian-splatting
 	url = https://github.com/ekolasky/gaussian-splatting.git
+	branch = master
 [submodule "submodules/co3d"]
 	path = submodules/co3d
 	url = https://github.com/facebookresearch/co3d.git
