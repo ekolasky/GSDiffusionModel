@@ -202,7 +202,6 @@ def process_category(category, links, start_batch=0):
         download_category_batch(category_path, link)
         sequence_frame_annotations = get_frame_annotations(category_path, add_to_log)
         sequence_frame_annotations = add_colmap_to_folders(sequence_frame_annotations, category_path, add_to_log)
-        break
         sequence_frame_annotations = add_gs_to_folders(sequence_frame_annotations, category_path, add_to_log)
         sequence_frame_annotations = remove_shs_from_models(sequence_frame_annotations, category_path, add_to_log)
         transfer_and_delete(sequence_frame_annotations, category_path)
